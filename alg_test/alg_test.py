@@ -6,6 +6,7 @@ class EquationAlg():
 
     # TO DO: add am/pm mode later to change HOURS_RANGE
     # TO DO: add feature to so only one of the equations (for hour or min) is mult/div; other one is purely arithmetic
+    # TO DO: adjust difficulty level of divsion (maybe decrease max_div_val?)
     def __init__(self):
         self.hours_range = list(range(0,23))
         self.mins_range = list(range(0,59))
@@ -121,6 +122,30 @@ class EquationAlg():
         return eqn_string
 
 
+    def getRandomDivEqn(self, val):
+        # get bounds based on max delta
+        min_bound, max_bound = val-self.max_del, val+self.max_del
+        if min_bound < self.abs_min_bound: min_bound = self.abs_min_bound
+        if max_bound < self.abs_max_bound: max_bound = self.abs_max_bound
+
+        # randomly select value based on bounds (if value is prime prompt again)
+        while not (cand_random_val:=random.randint(min_bound, max_bound)) in self.val_mults_dict:
+            cand_random_val = random.randint(min_bound, max_bound)
+
+        # generate delta to be applied and the multiplication equation for randomly selected value
+        delta = val - cand_random_val
+
+        val_mults = self.val_mults_dict[cand_random_val]
+        multiples = random.choice(val_mults)
+
+        # generate equation string
+        eqn_string = f"{multiples[0]} / {multiples[1]} + {delta}"
+        if delta < 0: eqn_string = f"{multiples[0]} / {multiples[1]} - {abs(delta)}"
+
+        # delta will be addition/subtraction of the multiplication result
+        return eqn_string
+
+
 if __name__ == "__main__":
     alg = EquationAlg()
     print(alg.getRandomMultEqn(15))
@@ -129,3 +154,10 @@ if __name__ == "__main__":
     print(alg.getRandomMultEqn(18))
     print(alg.getRandomMultEqn(18))
     print(alg.getRandomMultEqn(18))
+
+    print(alg.getRandomDivEqn(15))
+    print(alg.getRandomDivEqn(20))
+    print(alg.getRandomDivEqn(18))
+    print(alg.getRandomDivEqn(18))
+    print(alg.getRandomDivEqn(18))
+    print(alg.getRandomDivEqn(18))
