@@ -23,7 +23,12 @@ def findFacs(val):
     return fac1, fac2
 
 
-def generateDivisorTree(val):
+def isPrime(val): 
+    global PRIME_NUMS
+    return (val in PRIME_NUMS)
+
+
+def generateFactors(val):
     global VAL_FACS_DICT
 
     fac1, fac2 = findFacs(val)
@@ -55,14 +60,30 @@ def generateDivisorTree(val):
         if (not cand2_tup in VAL_FACS_DICT[val]) and (not cand2_tup_rev in VAL_FACS_DICT[val]): VAL_FACS_DICT[val].append(cand2_tup)
 
 
-def isPrime(val): 
-    global PRIME_NUMS
-    return (val in PRIME_NUMS)
+def generateMultiples(val):
+    global MAX_DIV_VAL, VAL_MULTS_DICT
+
+    counter = 2
+    res = val * counter
+
+    while res < MAX_DIV_VAL:
+        ordered_tup = (res, counter)
+
+        if VAL_MULTS_DICT.get(val) == None: VAL_MULTS_DICT[val] = [ordered_tup]
+        else: VAL_MULTS_DICT[val].append(ordered_tup)
+
+        counter += 1
+        res = val * counter
 
 
-def generateMultEqns(val):
-    if not isPrime(val): 
-        generateDivisorTree(val)
+def generateEqns():
+    global MINS_RANGE
+
+    for val in MINS_RANGE:
+        if (val > 1): 
+            generateMultiples(val)		                        # for division
+            if not isPrime(val): generateFactors(val)           # for multiplication
+
 
 def getRandomMultEqn(val):
     # get bounds based on max delta
@@ -71,27 +92,20 @@ def getRandomMultEqn(val):
     # generate multiplication equation for that value
     # delta will be addition/subtraction of the multiplication result
     return
-    
+
+
 if __name__ == "__main__":
     HOURS_RANGE = list(range(0,23))
     MINS_RANGE = list(range(0,59))
 
     PRIME_NUMS = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59}
+
     VAL_FACS_DICT = dict()
+    VAL_MULTS_DICT= dict()
 
-    for m in MINS_RANGE:
-        if (m > 1):
-            generateMultEqns(m)
-            # generateDivEqns(m)
+    MAX_DEL = 20                # inclusive
+    MAX_DIV_VAL = 99            # inclusive
 
-    for key, val in VAL_FACS_DICT.items():
-        print(f"{key}: {val}")
-    input("HERE")
+    generateEqns()
 
-    MAX_DEL = 20
 
-    OPERANDS_SET = set(range(1,100))
-
-    addition_f = lambda x,y: x+y
-    subtraction_f = lambda x,y: x-y
-    OPERATORS_SET = [add_f, sub_f, mult_f, div_f]
