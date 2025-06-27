@@ -1,111 +1,131 @@
 import sys
-from collections import deque
+import random
 
 
-def findFacsOdd(val):
-    global PRIME_NUMS
-    fac1, fac2 = -1, -1
+class EquationAlg():
 
-    for pn in PRIME_NUMS:
-        if (val%pn == 0):
-            fac1, fac2 = pn, val//pn
-            break
+    # TO DO: add am/pm mode later to change HOURS_RANGE
+    # TO DO: add feature to so only one of the equations (for hour or min) is mult/div; other one is purely arithmetic
+    def __init__(self):
+        self.hours_range = list(range(0,23))
+        self.mins_range = list(range(0,59))
+        self.abs_min_bound = min(min(self.hours_range), min(self.hours_range))
+        self.abs_max_bound = max(max(self.hours_range), max(self.hours_range))
 
-    return fac1, fac2
+        self.prime_nums = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59}
 
+        self.val_facs_dict = dict()
+        self.val_mults_dict = dict()
 
-def findFacs(val):
-    fac1, fac2 = -1, -1
-    
-    if (val%2 == 0): fac1, fac2 = 2, val//2
-    else: fac1, fac2 = findFacsOdd(val)
+        self.max_del = 20                # inclusive (max delta for addition/subtraction)
+        self.max_div_val = 99            # inclusive (max bound for division equations)
 
-    return fac1, fac2
-
-
-def isPrime(val): 
-    global PRIME_NUMS
-    return (val in PRIME_NUMS)
+        self.generateEqns()
 
 
-def generateFactors(val):
-    global VAL_FACS_DICT
+    def findFacsOdd(self, val):
+        fac1, fac2 = -1, -1
 
-    fac1, fac2 = findFacs(val)
+        for pn in self.prime_nums:
+            if (val%pn == 0):
+                fac1, fac2 = pn, val//pn
+                break
 
-    # validate fac1, fac2
-    if (fac1 == -1 or fac2 == -1):
-        print(f"ERR: finding facs failed for val {val}, returned: {fac1} {fac2}")
-        sys.exit(-1)
-    # fac1 should ALWAYS be smaller and prime
-    if not (isPrime(fac1) and fac1 <= fac2):
-        print(f"ERR: fac1 not both smaller and prime for val={val}: fac1={fac1}, fac2={fac2}")
-        sys.exit(-1) 
-
-    VAL_FACS_DICT[val] = [(fac1, fac2)]
-
-    if isPrime(fac2): return
-    if VAL_FACS_DICT.get(fac2) == None:
-        print(f"ERR: {fac2} expected to be prime or in dict")
-        sys.exit(-1)
-
-    print(f"val: {val}   fac1: {fac1}   fac2: {fac2}")
-
-    recurse_fac_vals = VAL_FACS_DICT[fac2]
-    for (f1,f2) in recurse_fac_vals:
-        cand1_tup, cand2_tup = (f2, fac1*f1), (f1, fac1*f2)
-        cand1_tup_rev, cand2_tup_rev = cand1_tup[::-1], cand2_tup[::-1]
-
-        if (not cand1_tup in VAL_FACS_DICT[val]) and (not cand1_tup_rev in VAL_FACS_DICT[val]): VAL_FACS_DICT[val].append(cand1_tup)
-        if (not cand2_tup in VAL_FACS_DICT[val]) and (not cand2_tup_rev in VAL_FACS_DICT[val]): VAL_FACS_DICT[val].append(cand2_tup)
+        return fac1, fac2
 
 
-def generateMultiples(val):
-    global MAX_DIV_VAL, VAL_MULTS_DICT
+    def findFacs(self, val):
+        fac1, fac2 = -1, -1
+        
+        if (val%2 == 0): fac1, fac2 = 2, val//2
+        else: fac1, fac2 = self.findFacsOdd(val)
 
-    counter = 2
-    res = val * counter
+        return fac1, fac2
 
-    while res < MAX_DIV_VAL:
-        ordered_tup = (res, counter)
 
-        if VAL_MULTS_DICT.get(val) == None: VAL_MULTS_DICT[val] = [ordered_tup]
-        else: VAL_MULTS_DICT[val].append(ordered_tup)
+    def isPrime(self, val): 
+        return (val in self.prime_nums)
 
-        counter += 1
+
+    def generateFactors(self, val):
+        fac1, fac2 = self.findFacs(val)
+
+        # validate fac1, fac2
+        if (fac1 == -1 or fac2 == -1):
+            print(f"ERR: finding facs failed for val {val}, returned: {fac1} {fac2}")
+            sys.exit(-1)
+        # fac1 should ALWAYS be smaller and prime
+        if not (self.isPrime(fac1) and fac1 <= fac2):
+            print(f"ERR: fac1 not both smaller and prime for val={val}: fac1={fac1}, fac2={fac2}")
+            sys.exit(-1) 
+
+        self.val_facs_dict[val] = [(fac1, fac2)]
+
+        if self.isPrime(fac2): return
+        if self.val_facs_dict.get(fac2) == None:
+            print(f"ERR: {fac2} expected to be prime or in dict")
+            sys.exit(-1)
+
+        print(f"val: {val}   fac1: {fac1}   fac2: {fac2}")
+
+        recurse_fac_vals = self.val_facs_dict[fac2]
+        for (f1,f2) in recurse_fac_vals:
+            cand1_tup, cand2_tup = (f2, fac1*f1), (f1, fac1*f2)
+            cand1_tup_rev, cand2_tup_rev = cand1_tup[::-1], cand2_tup[::-1]
+
+            if (not cand1_tup in self.val_facs_dict[val]) and (not cand1_tup_rev in self.val_facs_dict[val]): self.val_facs_dict[val].append(cand1_tup)
+            if (not cand2_tup in self.val_facs_dict[val]) and (not cand2_tup_rev in self.val_facs_dict[val]): self.val_facs_dict[val].append(cand2_tup)
+
+
+    def generateMultiples(self, val):
+        counter = 2
         res = val * counter
 
+        while res < self.max_div_val:
+            ordered_tup = (res, counter)
 
-def generateEqns():
-    global MINS_RANGE
+            if self.val_mults_dict.get(val) == None: self.val_mults_dict[val] = [ordered_tup]
+            else: self.val_mults_dict[val].append(ordered_tup)
 
-    for val in MINS_RANGE:
-        if (val > 1): 
-            generateMultiples(val)		                        # for division
-            if not isPrime(val): generateFactors(val)           # for multiplication
+            counter += 1
+            res = val * counter
 
 
-def getRandomMultEqn(val):
-    # get bounds based on max delta
-    # randomly select value based on bounds
-    # check if value is prime and just add or subtract
-    # generate multiplication equation for that value
-    # delta will be addition/subtraction of the multiplication result
-    return
+    def generateEqns(self):
+        for val in range(2, max(self.mins_range)):
+            self.generateMultiples(val)		                        # for division
+            if not self.isPrime(val): self.generateFactors(val)           # for multiplication
+
+
+    def getRandomMultEqn(self, val):
+        # get bounds based on max delta
+        min_bound, max_bound = val-self.max_del, val+self.max_del
+        if min_bound < self.abs_min_bound: min_bound = self.abs_min_bound
+        if max_bound < self.abs_max_bound: max_bound = self.abs_max_bound
+
+        # randomly select value based on bounds (if value is prime prompt again)
+        while not (cand_random_val:=random.randint(min_bound, max_bound)) in self.val_facs_dict:
+            cand_random_val = random.randint(min_bound, max_bound)
+
+        # generate delta to be applied and the multiplication equation for randomly selected value
+        delta = val - cand_random_val
+
+        val_factors = self.val_facs_dict[cand_random_val]
+        factors = random.choice(val_factors)
+
+        # generate equation string
+        eqn_string = f"{factors[0]} * {factors[1]} + {delta}"
+        if delta < 0: eqn_string = f"{factors[0]} * {factors[1]} - {abs(delta)}"
+
+        # delta will be addition/subtraction of the multiplication result
+        return eqn_string
 
 
 if __name__ == "__main__":
-    HOURS_RANGE = list(range(0,23))
-    MINS_RANGE = list(range(0,59))
-
-    PRIME_NUMS = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59}
-
-    VAL_FACS_DICT = dict()
-    VAL_MULTS_DICT= dict()
-
-    MAX_DEL = 20                # inclusive
-    MAX_DIV_VAL = 99            # inclusive
-
-    generateEqns()
-
-
+    alg = EquationAlg()
+    print(alg.getRandomMultEqn(15))
+    print(alg.getRandomMultEqn(20))
+    print(alg.getRandomMultEqn(18))
+    print(alg.getRandomMultEqn(18))
+    print(alg.getRandomMultEqn(18))
+    print(alg.getRandomMultEqn(18))
