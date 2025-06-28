@@ -6,22 +6,44 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushBut
 from PyQt5 import QtGui
 from PyQt5 import QtCore
 
+from alg_test import EquationAlg
+
 
 class UpdateMinObject(QtCore.QObject):
 
     signalUpdateTime = QtCore.pyqtSignal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, alg, mode='am', parent=None):
         super().__init__(parent)
+
+        self.alg = alg
+
+        self.valid_modes = {'am', 'military'}
+        if (mode not in self.valid_modes):
+            print(f"Error: invalid mode {mode}, expecting: {self.valid_modes}")
+            sys.exit(-1)
+        self.mode = mode
 
     @QtCore.pyqtSlot()
     def startWork(self, eqn_period=60):
         print("STARTING WORK")
         while True:
             cur_sec = datetime.now().second
+
             time.sleep(eqn_period - cur_sec)
 
-            time_str = datetime.now().strftime('%H:%M:%S %p')
+            now = datetime.now()
+            meridian = now.strftime("%p")
+            hour = now.hour
+            minute = now.minute
+
+            if (self.mode == 'am' and hour != 12): hour = hour % 12
+
+            hour_eqn = self.alg.getRandomEqn(hour)
+            min_eqn = self.alg.getRandomEqn(minute)
+
+            time_str = f"{hour_eqn}  :  {min_eqn} {meridian}"
+
             self.signalUpdateTime.emit(time_str)
 
 
@@ -66,6 +88,9 @@ class MyApp(QtCore.QObject):
         # Connect to app
         self.app = app
 
+        # Create equation generator
+        self.alg = EquationAlg()
+
         # Create gui
         self.gui = MyWindow()
         self.gui.show()
@@ -75,7 +100,7 @@ class MyApp(QtCore.QObject):
 
     def runWorkerThread(self):
         # Setup worker object and start worker thread
-        self.worker = UpdateMinObject()
+        self.worker = UpdateMinObject(self.alg)
         self.worker_thread = QtCore.QThread()
         self.worker.moveToThread(self.worker_thread)
         self.worker_thread.start()

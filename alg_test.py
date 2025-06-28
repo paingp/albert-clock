@@ -67,8 +67,6 @@ class EquationAlg():
             print(f"ERR: {fac2} expected to be prime or in dict")
             sys.exit(-1)
 
-        print(f"val: {val}   fac1: {fac1}   fac2: {fac2}")
-
         recurse_fac_vals = self.val_facs_dict[fac2]
         for (f1,f2) in recurse_fac_vals:
             cand1_tup, cand2_tup = (f2, fac1*f1), (f1, fac1*f2)
@@ -115,8 +113,8 @@ class EquationAlg():
         factors = random.choice(val_factors)
 
         # generate equation string
-        eqn_string = f"{factors[0]} * {factors[1]} + {delta}"
-        if delta < 0: eqn_string = f"{factors[0]} * {factors[1]} - {abs(delta)}"
+        eqn_string = f"({factors[0]} * {factors[1]}) + {delta}"
+        if delta < 0: eqn_string = f"({factors[0]} * {factors[1]}) - {abs(delta)}"
 
         # delta will be addition/subtraction of the multiplication result
         return eqn_string
@@ -139,12 +137,15 @@ class EquationAlg():
         multiples = random.choice(val_mults)
 
         # generate equation string
-        eqn_string = f"{multiples[0]} / {multiples[1]} + {delta}"
-        if delta < 0: eqn_string = f"{multiples[0]} / {multiples[1]} - {abs(delta)}"
+        eqn_string = f"({multiples[0]} / {multiples[1]}) + {delta}"
+        if delta < 0: eqn_string = f"({multiples[0]} / {multiples[1]}) - {abs(delta)}"
 
         # delta will be addition/subtraction of the multiplication result
         return eqn_string
 
+    def getRandomEqn(self, val):
+        if (random.randint(0,1) == 0): return self.getRandomMultEqn(val)
+        else: return self.getRandomDivEqn(val)
 
 if __name__ == "__main__":
     alg = EquationAlg()
