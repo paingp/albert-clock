@@ -8,80 +8,107 @@ from PyQt5 import QtGui
 from PyQt5 import QtCore
 
 from alg_test import EquationAlg
-
+# TO DO import your own equation here
 
 class Worker(QtCore.QObject):
 
     updateTimeSig = QtCore.pyqtSignal(str)
     updateAnsSig = QtCore.pyqtSignal(str)
 
-    def __init__(self, alg, mode='am', parent=None):
+    def __init__(self, alg, time_mode='am', diff_mode='easy', parent=None):
         super().__init__(parent)
 
         self.alg = alg
 
-        # check mode validity
-        self.valid_modes = {'am', 'military'}
-        if (mode not in self.valid_modes):
-            print(f"Error: invalid mode {mode}, expecting: {self.valid_modes}")
+        # check time mode validity
+        self.valid_time_modes = {'am', 'military'}
+        if (time_mode not in self.valid_time_modes):
+            print(f"Error: invalid time mode {time_mode}, expecting: {self.valid_time_modes}")
             sys.exit(-1)
 
-        self.mode = mode
-        self.modeLock = threading.Lock()
+        # check difficuly mode validity
+        self.valid_diff_modes = {'easy', 'hard'}
+        if (diff_mode not in self.valid_diff_modes):
+            print(f"Error: invalid diff mode {diff_mode}, expecting: {self.valid_diff_modes}")
+            sys.exit(-1)
 
-    def getMode(self):
-        mode = ''
+        self.time_mode = time_mode
+        self.time_mode_lock = threading.Lock()
 
-        self.modeLock.acquire()
-        mode = self.mode
-        self.modeLock.release()
+        self.diff_mode = diff_mode
+        self.diff_mode_lock = threading.Lock()
 
-        return mode
+    def getTimeMode(self):
+        time_mode = ''
+
+        self.time_mode_lock.acquire()
+        time_mode = self.time_mode
+        self.time_mode_lock.release()
+
+        return time_mode
+
+    def getDiffMode(self):
+        diff_mode = ''
+
+        self.diff_mode.acquire()
+        diff_mode = self.diff_mode
+        self.diff_mode.release()
+
+        return diff_mode
 
     @QtCore.pyqtSlot()
     def getTimeEqnStr(self):
         time_str = ""
         
+        # get current hour and min
         now = datetime.now()
-        meridian = f"  {now.strftime('%p')}"
         hour = now.hour
         minute = now.minute
 
-        if (self.getMode() == 'am'):
+        # get meridian string
+        meridian = f"  {now.strftime('%p')}"
+        if (self.getTimeMode() == 'am'):
             if (hour != 12): hour = hour % 12
         else:
             meridian = ""
 
-        hour_eqn = self.alg.getRandomEqn(hour)
-        min_eqn = self.alg.getRandomEqn(minute)
+        # get equation
+        hour_eqn, min_eqn = "", ""
+        if (self.diff_mode == 'easy'):
+            # TO DO: generate your own equation for hour_eqn and min_eqn here if diff_mode is easy
+            hour_eqn = "HOUR"
+            min_eqn = "MIN"
+        elif (self.diff_mode == 'hard'):
+            hour_eqn = self.alg.getRandomEqn(hour)
+            min_eqn = self.alg.getRandomEqn(minute)
 
         time_str = f"{hour_eqn}  :  {min_eqn}" + meridian
 
         return time_str
 
     @QtCore.pyqtSlot()
-    def updateMode(self, mode):
-        print(f"UPDATING MODE TO {mode}")
+    def updateTimeMode(self, time_mode):
+        print(f"UPDATING TIME_MODE TO {time_mode}")
         # update mode
-        self.modeLock.acquire()
-        self.mode = mode
-        self.modeLock.release()
+        self.time_mode_lock.acquire()
+        self.time_mode = time_mode
+        self.time_mode_lock.release()
 
         # update display to reflect
         time_str = self.getTimeEqnStr()
         self.updateTimeSig.emit(time_str)
 
     @QtCore.pyqtSlot()
-    def startTimeThread(self, eqn_period=60):
-        print("STARTING TIME THREAD")
-        while True:
-            # wait till the start of next period
-            cur_sec = datetime.now().second
-            time.sleep(eqn_period - cur_sec)
+    def updateDiffMode(self, diff_mode):
+        print(f"UPDATING DIFF_MODE TO {diff_mode}")
+        # update mode
+        self.diff_mode_lock.acquire()
+        self.diff_mode = diff_mode
+        self.diff_mode_lock.release()
 
-            # update display
-            time_str = self.getTimeEqnStr()
-            self.updateTimeSig.emit(time_str)
+        # update display to reflect
+        time_str = self.getTimeEqnStr()
+        self.updateTimeSig.emit(time_str)
 
     @QtCore.pyqtSlot()
     def getAnswerStr(self, show_flag):
@@ -95,7 +122,7 @@ class Worker(QtCore.QObject):
             hour = now.hour
             minute = now.minute
 
-            if (self.getMode() == 'am'):
+            if (self.getTimeMode() == 'am'):
                 if (hour != 12): hour = hour % 12
             else:
                 meridian = ""
@@ -104,6 +131,17 @@ class Worker(QtCore.QObject):
 
         self.updateAnsSig.emit(time_str)
 
+    @QtCore.pyqtSlot()
+    def startTimeThread(self, eqn_period=60):
+        print("STARTING TIME THREAD")
+        while True:
+            # wait till the start of next period
+            cur_sec = datetime.now().second
+            time.sleep(eqn_period - cur_sec)
+
+            # update display
+            time_str = self.getTimeEqnStr()
+            self.updateTimeSig.emit(time_str)
 
 
 class MyWindow(QWidget):
@@ -124,9 +162,13 @@ class MyWindow(QWidget):
         self.time_label.setFont(QtGui.QFont("Arial", 40))
         self.time_label.setGeometry(0,0,500,100)
 
+        # change time mode button
+        self.change_time_mode_button = QPushButton('Change Time Mode', self)
+        self.change_time_mode_button.setCheckable(True)
+
         # change mode button
-        self.change_mode_button = QPushButton('Change Mode', self)
-        self.change_mode_button.setCheckable(True)
+        self.change_diff_mode_button = QPushButton('Change Diff Mode', self)
+        self.change_diff_mode_button.setCheckable(True)
 
         # answer label
         self.answer_label = QLabel("", self)
@@ -140,7 +182,8 @@ class MyWindow(QWidget):
         # add all widgets to layout
         layout = QVBoxLayout()
         layout.addWidget(self.time_label)
-        layout.addWidget(self.change_mode_button)
+        layout.addWidget(self.change_time_mode_button)
+        layout.addWidget(self.change_diff_mode_button)
         layout.addWidget(self.answer_label)
         layout.addWidget(self.show_answer_button)
 
@@ -192,9 +235,14 @@ class MyApp(QtCore.QObject):
         # worker->gui update answer label signal
         self.worker.updateAnsSig.connect(self.gui.updateAnsDisplay)
 
-        # gui->worker update mode signal (lambda function to translate button toggle state -> mode string)
-        self.gui.change_mode_button.clicked.connect(
-            lambda: self.worker.updateMode("am" if self.gui.change_mode_button.isChecked() else "military")
+        # gui->worker update time mode signal (lambda function to translate button toggle state -> time mode string)
+        self.gui.change_time_mode_button.clicked.connect(
+            lambda: self.worker.updateTimeMode("am" if self.gui.change_time_mode_button.isChecked() else "military")
+        )
+
+        # gui->worker update diff mode signal (lambda function to translate button toggle state -> diff mode string)
+        self.gui.change_diff_mode_button.clicked.connect(
+            lambda: self.worker.updateDiffMode("easy" if self.gui.change_diff_mode_button.isChecked() else "hard")
         )
 
         # gui->worker show answer signal (use button toggle state as flag to show/hide answer)
@@ -216,9 +264,11 @@ class MyApp(QtCore.QObject):
         
 
 def main():
+    # create app
     app = QApplication(sys.argv)
     myApp = MyApp(app)
 
+    # start the app
     sys.exit(app.exec_())
 
 
