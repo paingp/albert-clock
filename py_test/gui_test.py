@@ -8,7 +8,9 @@ from PyQt5 import QtGui
 from PyQt5 import QtCore
 
 from alg_test import EquationAlg
-# TO DO import your own equation here
+
+from get_time import create_equation
+
 
 class Worker(QtCore.QObject):
 
@@ -76,8 +78,8 @@ class Worker(QtCore.QObject):
         hour_eqn, min_eqn = "", ""
         if (self.diff_mode == 'easy'):
             # TO DO: generate your own equation for hour_eqn and min_eqn here if diff_mode is easy
-            hour_eqn = "HOUR"
-            min_eqn = "MIN"
+            hour_eqn = create_equation(hour)
+            min_eqn = create_equation(minute)
         elif (self.diff_mode == 'hard'):
             hour_eqn = self.alg.getRandomEqn(hour)
             min_eqn = self.alg.getRandomEqn(minute)
@@ -153,7 +155,7 @@ class MyWindow(QWidget):
 
         # set up window
         self.setWindowTitle("test clock")
-        self.setGeometry(100, 100, 400, 200)
+        self.showMaximized()
 
         # WIDGETS
         # time label
