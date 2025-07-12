@@ -1,5 +1,5 @@
-#ifndef WORKER_H
-#define WORKER_H
+#ifndef MY_WORKER_H
+#define MY_WORKER_H
 
 // os includes
 #include <QObject>
@@ -7,12 +7,12 @@
 
 // local includes
 
-class Worker : public QObject {
+class MyWorker : public QObject {
     Q_OBJECT
 
     public:
 
-        Worker(QObject* parent=nullptr);
+        MyWorker(QObject* parent=nullptr);
 
         std::string GetMode();
         void updateMode();
@@ -20,8 +20,9 @@ class Worker : public QObject {
     private:
 
         std::string mode;
-        
 
+        void Initialize();
+        
     signals:
 
         void updateTimeLablSig(QString time_str);

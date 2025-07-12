@@ -1,8 +1,6 @@
 #ifndef MYWINDOW_H
 #define MYWINDOW_H
 
-#pragma once
-
 // os inclues
 #include <QWidget>
 #include <QLabel>
@@ -16,23 +14,25 @@
 class MyWindow : public QWidget {
     Q_OBJECT
 
-   public:
+    public:
 
         explicit MyWindow(QWidget* parent = nullptr);
-
-        void updateTimeLabel(QString time_str);
-        void updateAnswerLabel(QString time_str);
 
     private:
 
         QLabel* time_label;
+        QPushButton* toggle_time_mode_button;
+        QPushButton* toggle_diff_mode_button;
         QLabel* answer_label;
-        QPushButton* toggle_mode_button;
         QPushButton* toggle_answer_button;
 
         QVBoxLayout* layout;
 
         void Initialize();
+
+    private Q_SLOTS: 
+        void updateTimeLabel(QString time_str);
+        void updateAnswerLabel(QString ans_str);
 };
 
 #endif

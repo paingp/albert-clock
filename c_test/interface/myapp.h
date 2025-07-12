@@ -14,6 +14,7 @@ class MyApp : public QApplication {
 
     private:
         MyWindow* window_obj;
+        Worker* worker;
 
         void Initialize();
 };
