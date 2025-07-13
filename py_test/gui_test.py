@@ -8,7 +8,9 @@ from PyQt5 import QtGui
 from PyQt5 import QtCore
 
 from alg_test import EquationAlg
-# TO DO import your own equation here
+
+from get_time import create_equation
+
 
 class Worker(QtCore.QObject):
 
@@ -76,8 +78,8 @@ class Worker(QtCore.QObject):
         hour_eqn, min_eqn = "", ""
         if (self.diff_mode == 'easy'):
             # TO DO: generate your own equation for hour_eqn and min_eqn here if diff_mode is easy
-            hour_eqn = "HOUR"
-            min_eqn = "MIN"
+            hour_eqn = create_equation(hour)
+            min_eqn = create_equation(minute)
         elif (self.diff_mode == 'hard'):
             hour_eqn = self.alg.getRandomEqn(hour)
             min_eqn = self.alg.getRandomEqn(minute)
@@ -153,14 +155,14 @@ class MyWindow(QWidget):
 
         # set up window
         self.setWindowTitle("test clock")
-        self.setGeometry(100, 100, 400, 200)
+        self.showMaximized()
 
         # WIDGETS
         # time label
         cur_time_str = datetime.now().strftime('%H:%M:%S %p')
         self.time_label = QLabel(cur_time_str, self)
         self.time_label.setFont(QtGui.QFont("Arial", 40))
-        self.time_label.setGeometry(0,0,500,100)
+        #self.time_label.setGeometry(0,0,500,100)
 
         # change time mode button
         self.change_time_mode_button = QPushButton('Change Time Mode', self)
@@ -169,11 +171,13 @@ class MyWindow(QWidget):
         # change mode button
         self.change_diff_mode_button = QPushButton('Change Diff Mode', self)
         self.change_diff_mode_button.setCheckable(True)
-
+        # dark mode button
+        self.dark_mode_button = QPushButton('Dark Mode', self)
+        self.dark_mode_button.setCheckable(True)
         # answer label
         self.answer_label = QLabel("", self)
         self.answer_label.setFont(QtGui.QFont("Arial", 30))
-        self.answer_label.setGeometry(0,0,500,100)
+        #self.answer_label.setGeometry(0,0,500,100)
 
         # show answer button
         self.show_answer_button = QPushButton('Show Answer', self)
@@ -186,6 +190,7 @@ class MyWindow(QWidget):
         layout.addWidget(self.change_diff_mode_button)
         layout.addWidget(self.answer_label)
         layout.addWidget(self.show_answer_button)
+        layout.addWidget(self.dark_mode_button)
 
         # set layout
         self.setLayout(layout)
@@ -198,8 +203,85 @@ class MyWindow(QWidget):
     @QtCore.pyqtSlot(str)
     def updateAnsDisplay(self, time_str):
         self.answer_label.setText(time_str)
-
-
+        
+      # dark mode changing color theme
+    @QtCore.pyqtSlot()
+    def toggleDarkMode(self):
+        # the text kept going up and down when switching modes, so i had to set the font for everything again
+        time_font = QtGui.QFont("Arial", 40)
+        time_font.setStyleStrategy(QtGui.QFont.PreferAntialias)
+        time_font.setHintingPreference(QtGui.QFont.PreferNoHinting)
+    
+        answer_font = QtGui.QFont("Arial", 30)
+        answer_font.setStyleStrategy(QtGui.QFont.PreferAntialias)
+        answer_font.setHintingPreference(QtGui.QFont.PreferNoHinting)
+    
+        # aligning the font and time consistently
+        self.time_label.setFont(time_font)
+        self.time_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.time_label.setContentsMargins(0, 0, 0, 0)
+    
+        self.answer_label.setFont(answer_font)
+        self.answer_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.answer_label.setContentsMargins(0, 0, 0, 0)
+    
+        if self.dark_mode_button.isChecked():
+            # dark mode stylesheet
+            self.setStyleSheet("""
+                QWidget {
+                    background-color: #000000;
+                    color: #ffffff;
+                }
+                QLabel {
+                    background-color: transparent;
+                    color: #ffffff;
+                    margin: 0px;
+                    padding: 0px;
+                    border: 0px;
+                }
+                QPushButton {
+                    background-color: #000000;
+                    color: #ffffff;
+                    border: 1px solid #333333;
+                    padding: 5px;
+                    border-radius: 3px;
+                }
+                QPushButton:checked {
+                background-color: #1a1a1a;
+                }
+                QPushButton:hover {
+                    background-color: #0d0d0d;
+                }
+            """)
+        else:
+                # light mode stylesheet (kept showing the hover thing so i just added it so it's consistent)
+                self.setStyleSheet("""
+                    QWidget {
+                        background-color: #ffffff;
+                        color: #000000;
+                    }
+                    QLabel {
+                        background-color: transparent;
+                        color: #000000;
+                        margin: 0px;
+                        padding: 0px;
+                        border: 0px;
+                    }
+                    QPushButton {
+                        background-color: #f0f0f0;
+                        color: #000000;
+                        border: 1px solid #999999;
+                        padding: 5px;
+                        border-radius: 3px;
+                    }
+                    QPushButton:checked {
+                        background-color: #dcdcdc;
+                    }
+                    QPushButton:hover {
+                        background-color: #e0e0e0;
+                    }
+                """)
+        
 
 class MyApp(QtCore.QObject):
 
@@ -262,7 +344,9 @@ class MyApp(QtCore.QObject):
         time.sleep(0.2)
         self.startUpdateTimeThreadSig.emit()
         
-
+        # gui->dark mode toggle signal (switches between light and dark themes)
+        self.gui.dark_mode_button.clicked.connect(self.gui.toggleDarkMode)
+        
 def main():
     # create app
     app = QApplication(sys.argv)
