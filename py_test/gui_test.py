@@ -1,9 +1,11 @@
 import sys
-from datetime import datetime
+import os
 import time
+
+from datetime import datetime
 import threading
 
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
 from PyQt5 import QtGui
 from PyQt5 import QtCore
 
@@ -11,54 +13,216 @@ from alg_test import EquationAlg
 
 from get_time import create_equation
 
+import pigpio
+from ir_hasher import hasher
 
-class Worker(QtCore.QObject):
 
-    updateTimeSig = QtCore.pyqtSignal(str)
-    updateAnsSig = QtCore.pyqtSignal(str)
 
-    def __init__(self, alg, time_mode='am', diff_mode='easy', parent=None):
+class IRWorker(QtCore.QObject):
+
+    cycle_time_mode_sig = QtCore.pyqtSignal()
+    cycle_diff_mode_sig = QtCore.pyqtSignal()
+    toggle_answer_flag_sig = QtCore.pyqtSignal()
+    toggle_dark_mode_sig = QtCore.pyqtSignal()
+
+    def __init__(self, parent=None):
         super().__init__(parent)
+
+        # start pigpiod
+        os.system("sudo pigpiod")
+
+        self.gpio_ir = 17
+
+        self.pi = pigpio.pi()
+        if (not self.pi.connected):
+            print(f"Error: pigpio failed to connected")
+            exit()
+        
+        self.hashes = {
+            1902227973: '1',
+            435909485: '2',
+            2736323565: '3',
+            430130277: '4',
+        }
+
+        self.ir = hasher(self.pi, self.gpio_ir, self.cbFunc)
+
+        print("IR WORKER INITIALIZED")
+
+    def _destroy(self):
+        self.ir._destroy()
+
+    def cbFunc(self, hash):
+        clicked = "UNKNOWN"
+
+        if (hash in self.hashes):
+            clicked = self.hashes[hash]
+
+            match (clicked):
+                case '1': 
+                    print("1 CLICKED")
+                    print("Signal object ID at emit:", id(self.cycle_time_mode_sig))
+                    self.cycle_time_mode_sig.emit()
+                case '2':
+                    print("2 CLICKED")
+                    self.cycle_diff_mode_sig.emit()
+                case '3':
+                    print("3 CLICKED")
+                    self.toggle_answer_flag_sig.emit()
+                case '4':
+                    print("4 CLICKED")
+                    self.toggle_dark_mode_sig.emit()
+
+
+
+class TimeWorker(QtCore.QObject):
+
+    update_time_sig = QtCore.pyqtSignal(str)
+    update_ans_sig = QtCore.pyqtSignal(str)
+    update_dark_sig = QtCore.pyqtSignal(bool)
+
+    def __init__(self, alg, parent=None):
+        super().__init__(parent)
+
+        self.work_flag = True
+        self.work_flag_lock = threading.Lock()
 
         self.alg = alg
 
-        # check time mode validity
-        self.valid_time_modes = {'am', 'military'}
-        if (time_mode not in self.valid_time_modes):
-            print(f"Error: invalid time mode {time_mode}, expecting: {self.valid_time_modes}")
-            sys.exit(-1)
+        self.time_modes = ['am', 'military']
+        self.num_time_modes = len(self.time_modes)
+        self.time_mode_ind = 0
+        self.time_mode_ind_lock = threading.Lock()
 
-        # check difficuly mode validity
-        self.valid_diff_modes = {'easy', 'hard'}
-        if (diff_mode not in self.valid_diff_modes):
-            print(f"Error: invalid diff mode {diff_mode}, expecting: {self.valid_diff_modes}")
-            sys.exit(-1)
+        self.diff_modes = ['easy', 'hard']
+        self.num_diff_modes = len(self.diff_modes)
+        self.diff_mode_ind = 0
+        self.diff_mode_ind_lock = threading.Lock()
 
-        self.time_mode = time_mode
-        self.time_mode_lock = threading.Lock()
+        self.answer_flag = False
+        self.answer_flag_lock = threading.Lock()
 
-        self.diff_mode = diff_mode
-        self.diff_mode_lock = threading.Lock()
+        self.dark_mode = False
+        self.dark_mode_lock = threading.Lock()
+
+        print("TIME WORKER INITIALIZED")
+
+    # Get Methods w/ thread lock
+    def getWorkFlag(self):
+        work_flag = False
+
+        self.work_flag_lock.acquire()
+        work_flag = self.work_flag
+        self.work_flag_lock.release()
+
+        return work_flag
+
+    def getTimeModeInd(self):
+        time_mode_ind = -1
+
+        self.time_mode_ind_lock.acquire()
+        time_mode_ind = self.time_mode_ind
+        self.time_mode_ind_lock.release()
+
+        return time_mode_ind;
 
     def getTimeMode(self):
-        time_mode = ''
+        time_mode = ""
+        
+        time_mode_ind = self.getTimeModeInd()
 
-        self.time_mode_lock.acquire()
-        time_mode = self.time_mode
-        self.time_mode_lock.release()
+        if (time_mode_ind < self.num_time_modes):
+            time_mode = self.time_modes[time_mode_ind]
 
         return time_mode
 
-    def getDiffMode(self):
-        diff_mode = ''
+    def getDiffModeInd(self):
+        diff_mode_ind = -1
 
-        self.diff_mode.acquire()
-        diff_mode = self.diff_mode
-        self.diff_mode.release()
+        self.diff_mode_ind_lock.acquire()
+        diff_mode_ind = self.diff_mode_ind
+        self.diff_mode_ind_lock.release()
+
+        return diff_mode_ind;
+
+    def getDiffMode(self):
+        diff_mode = ""
+        
+        diff_mode_ind = self.getDiffModeInd()
+
+        if (diff_mode_ind < self.num_diff_modes):
+            diff_mode = self.diff_modes[diff_mode_ind]
 
         return diff_mode
 
-    @QtCore.pyqtSlot()
+    def getAnswerFlag(self):
+        answer_flag = False
+
+        self.answer_flag_lock.acquire()
+        answer_flag = self.answer_flag
+        self.answer_flag_lock.release()
+
+        return answer_flag
+
+    def getDarkMode(self):
+        dark_mode = False
+
+        self.dark_mode_lock.acquire()
+        dark_mode = self.dark_mode
+        self.dark_mode_lock.release()
+
+        return dark_mode
+
+    # Set Methods w/ thread lock
+    def setWorkFlag(self, work_flag:bool):
+        self.work_flag_lock.acquire()
+        self.work_flag = work_flag
+        self.work_flag_lock.release()
+
+    def setTimeModeInd(self, ind:int):
+        if (ind < 0) or (ind >= self.num_time_modes): return
+
+        self.time_mode_ind_lock.acquire()
+        self.time_mode_ind = ind
+        self.time_mode_ind_lock.release()
+
+    def setDiffModeInd(self, ind:int):
+        if (ind < 0) or (ind >= self.num_diff_modes): return
+
+        self.diff_mode_ind_lock.acquire()
+        self.diff_mode_ind = ind 
+        self.diff_mode_ind_lock.release()
+
+    def setAnswerFlag(self, answer_flag:bool):
+        self.answer_flag_lock.acquire()
+        self.answer_flag = answer_flag
+        self.answer_flag_lock.release()
+
+    def setDarkMode(self, dark_mode:bool):
+        self.dark_mode_lock.acquire()
+        self.dark_mode = dark_mode
+        self.dark_mode_lock.release()
+
+    # Update methods
+    def IncrementTimeModeInd(self):
+        next_ind = (self.getTimeModeInd() + 1) % self.num_time_modes
+        setTimeMode(next_ind)
+
+    def IncrementDiffModeInd(self):
+        next_ind = (self.getDiffModeInd() + 1) % self.num_diff_modes
+        setDiffMode(next_ind)
+
+    # Send signal methods
+    def sendUpdateTimeLabelSig(self, time_str:str):
+        self.update_time_sig.emit(time_str)
+
+    def sendUpdateAnsLabelSig(self, ans_time_str:str):
+        self.update_ans_sig.emit(ans_time_str)
+
+    def sendUpdateDarkModeSig(self, dark_mode:bool):
+        self.update_dark_sig.emit(dark_mode)
+
+    # Get time string methods
     def getTimeEqnStr(self):
         time_str = ""
         
@@ -76,11 +240,12 @@ class Worker(QtCore.QObject):
 
         # get equation
         hour_eqn, min_eqn = "", ""
-        if (self.diff_mode == 'easy'):
-            # TO DO: generate your own equation for hour_eqn and min_eqn here if diff_mode is easy
+        diff_mode = self.getDiffMode()
+
+        if (diff_mode == 'easy'):
             hour_eqn = create_equation(hour)
             min_eqn = create_equation(minute)
-        elif (self.diff_mode == 'hard'):
+        elif (diff_mode == 'hard'):
             hour_eqn = self.alg.getRandomEqn(hour)
             min_eqn = self.alg.getRandomEqn(minute)
 
@@ -88,37 +253,10 @@ class Worker(QtCore.QObject):
 
         return time_str
 
-    @QtCore.pyqtSlot()
-    def updateTimeMode(self, time_mode):
-        print(f"UPDATING TIME_MODE TO {time_mode}")
-        # update mode
-        self.time_mode_lock.acquire()
-        self.time_mode = time_mode
-        self.time_mode_lock.release()
-
-        # update display to reflect
-        time_str = self.getTimeEqnStr()
-        self.updateTimeSig.emit(time_str)
-
-    @QtCore.pyqtSlot()
-    def updateDiffMode(self, diff_mode):
-        print(f"UPDATING DIFF_MODE TO {diff_mode}")
-        # update mode
-        self.diff_mode_lock.acquire()
-        self.diff_mode = diff_mode
-        self.diff_mode_lock.release()
-
-        # update display to reflect
-        time_str = self.getTimeEqnStr()
-        self.updateTimeSig.emit(time_str)
-
-    @QtCore.pyqtSlot()
-    def getAnswerStr(self, show_flag):
-        print("TOGGLING ANSWER STR")
-
+    def getAnswerStr(self, show_answer_flag):
         time_str = ""
 
-        if (show_flag):
+        if (show_answer_flag):
             now = datetime.now()
             meridian = f"  {now.strftime('%p')}"
             hour = now.hour
@@ -131,29 +269,73 @@ class Worker(QtCore.QObject):
 
             time_str = f"{hour}  :  {minute}" + meridian
 
-        self.updateAnsSig.emit(time_str)
+        return time_str
 
-    @QtCore.pyqtSlot()
+    # Process IR rx msgs
+    def CycleTimeMode(self):
+        print("HEREEEEE")
+        self.IncrementTimeModeInd()
+        print(f"UPDATING TIME_MODE TO {self.getTimeMode()}")
+
+        time_str = self.getTimeEqnStr()
+        self.sendUpdateTimeLabelSig(time_str)
+
+        # sync answer's string to correct time_mode if it's being shown as well
+        if (self.getAnswerFlag()):
+            ans_time_str = self.getAnswerStr(answer_flag)
+            self.sendUpdateAnsLabelSig(ans_time_str)
+
+    def CycleDiffMode(self):
+        self.IncrementDiffModeInd()
+        print(f"UPDATING TIME_MODE TO {self.getDiffMode()}")
+
+        time_str = self.getTimeEqnStr()
+        self.sendUpdateTimeLabelSig(time_str)
+
+    def toggleAnswerFlag(self):
+        toggled = not (self.getAnswerFlag())
+        self.setAnswerFlag(toggled)
+
+        answer_flag = self.getAnswerFlag()
+        print(f"UPDATING ANSWER_FLAG TO {answer_flag}")
+
+        ans_time_str = self.getAnswerStr(answer_flag)
+        self.sendUpdateAnsLabelSig(ans_time_str)
+        
+    def toggleDarkMode(self):
+        toggled = not (self.getDarkMode())
+        self.setDarkMode(toggled)
+
+        dark_mode = self.getDarkMode()
+        print(f"UPDATING DARK_MODE TO {dark_mode}")
+
+        self.sendUpdateDarkModeSig(dark_mode)
+
+    # Thread method for self update every minute
     def startTimeThread(self, eqn_period=60):
         print("STARTING TIME THREAD")
-        while True:
+        self.setWorkFlag(True);
+
+        while (self.getWorkFlag()):
             # wait till the start of next period
             cur_sec = datetime.now().second
             time.sleep(eqn_period - cur_sec)
 
             # update display
             time_str = self.getTimeEqnStr()
-            self.updateTimeSig.emit(time_str)
+            self.update_time_sig.emit(time_str)
+
+    def stopTimeThread(self):
+        self.setWorkFlag(False);
+
 
 
 class MyWindow(QWidget):
 
-    updateTimeDoneSig = QtCore.pyqtSignal(str)
-
     def __init__(self):
         super().__init__()
 
-        # set up window
+        # SET UP WINDOW
         self.setWindowTitle("test clock")
         self.showMaximized()
 
@@ -164,68 +346,51 @@ class MyWindow(QWidget):
         self.time_label.setFont(QtGui.QFont("Arial", 40))
         #self.time_label.setGeometry(0,0,500,100)
 
-        # change time mode button
-        self.change_time_mode_button = QPushButton('Change Time Mode', self)
-        self.change_time_mode_button.setCheckable(True)
-
-        # change mode button
-        self.change_diff_mode_button = QPushButton('Change Diff Mode', self)
-        self.change_diff_mode_button.setCheckable(True)
-        # dark mode button
-        self.dark_mode_button = QPushButton('Dark Mode', self)
-        self.dark_mode_button.setCheckable(True)
         # answer label
         self.answer_label = QLabel("", self)
         self.answer_label.setFont(QtGui.QFont("Arial", 30))
         #self.answer_label.setGeometry(0,0,500,100)
 
-        # show answer button
-        self.show_answer_button = QPushButton('Show Answer', self)
-        self.show_answer_button.setCheckable(True)
-
         # add all widgets to layout
         layout = QVBoxLayout()
         layout.addWidget(self.time_label)
-        layout.addWidget(self.change_time_mode_button)
-        layout.addWidget(self.change_diff_mode_button)
         layout.addWidget(self.answer_label)
-        layout.addWidget(self.show_answer_button)
-        layout.addWidget(self.dark_mode_button)
 
         # set layout
         self.setLayout(layout)
 
+        print("WINDOW INITIALIZED")
+
     @QtCore.pyqtSlot(str)
     def updateTimeDisplay(self, time_str):
         self.time_label.setText(time_str)
-        self.updateTimeDoneSig.emit(time_str)
 
     @QtCore.pyqtSlot(str)
     def updateAnsDisplay(self, time_str):
         self.answer_label.setText(time_str)
-        
-      # dark mode changing color theme
-    @QtCore.pyqtSlot()
-    def toggleDarkMode(self):
+
+    # dark mode changing color theme
+    @QtCore.pyqtSlot(bool)
+    def updateDarkMode(self, dark_mode):
         # the text kept going up and down when switching modes, so i had to set the font for everything again
         time_font = QtGui.QFont("Arial", 40)
         time_font.setStyleStrategy(QtGui.QFont.PreferAntialias)
         time_font.setHintingPreference(QtGui.QFont.PreferNoHinting)
-    
+
         answer_font = QtGui.QFont("Arial", 30)
         answer_font.setStyleStrategy(QtGui.QFont.PreferAntialias)
         answer_font.setHintingPreference(QtGui.QFont.PreferNoHinting)
-    
+
         # aligning the font and time consistently
         self.time_label.setFont(time_font)
         self.time_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.time_label.setContentsMargins(0, 0, 0, 0)
-    
+
         self.answer_label.setFont(answer_font)
         self.answer_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.answer_label.setContentsMargins(0, 0, 0, 0)
-    
-        if self.dark_mode_button.isChecked():
+
+        if dark_mode:
             # dark mode stylesheet
             self.setStyleSheet("""
                 QWidget {
@@ -239,53 +404,29 @@ class MyWindow(QWidget):
                     padding: 0px;
                     border: 0px;
                 }
-                QPushButton {
-                    background-color: #000000;
-                    color: #ffffff;
-                    border: 1px solid #333333;
-                    padding: 5px;
-                    border-radius: 3px;
+            """)
+
+        else:
+            # light mode stylesheet (kept showing the hover thing so i just added it so it's consistent)
+            self.setStyleSheet("""
+                QWidget {
+                    background-color: #ffffff;
+                    color: #000000;
                 }
-                QPushButton:checked {
-                background-color: #1a1a1a;
-                }
-                QPushButton:hover {
-                    background-color: #0d0d0d;
+                QLabel {
+                    background-color: transparent;
+                    color: #000000;
+                    margin: 0px;
+                    padding: 0px;
+                    border: 0px;
                 }
             """)
-        else:
-                # light mode stylesheet (kept showing the hover thing so i just added it so it's consistent)
-                self.setStyleSheet("""
-                    QWidget {
-                        background-color: #ffffff;
-                        color: #000000;
-                    }
-                    QLabel {
-                        background-color: transparent;
-                        color: #000000;
-                        margin: 0px;
-                        padding: 0px;
-                        border: 0px;
-                    }
-                    QPushButton {
-                        background-color: #f0f0f0;
-                        color: #000000;
-                        border: 1px solid #999999;
-                        padding: 5px;
-                        border-radius: 3px;
-                    }
-                    QPushButton:checked {
-                        background-color: #dcdcdc;
-                    }
-                    QPushButton:hover {
-                        background-color: #e0e0e0;
-                    }
-                """)
-        
+
+
 
 class MyApp(QtCore.QObject):
 
-    startUpdateTimeThreadSig = QtCore.pyqtSignal()
+    start_update_time_thread_sig = QtCore.pyqtSignal()
 
     def __init__(self, app, parent=None):
         super().__init__(parent)
@@ -300,61 +441,47 @@ class MyApp(QtCore.QObject):
         self.gui = MyWindow()
         self.gui.show()
 
-        # Start worker thread
-        self.runWorkerThread()
+        # Configure IR daemon
+        self.ir_worker = IRWorker()
 
-    def runWorkerThread(self):
-        # Setup worker object and start worker thread
-        self.worker = Worker(self.alg)
-        self.worker_thread = QtCore.QThread()
-        self.worker.moveToThread(self.worker_thread)
-        self.worker_thread.start()
+        # Set up time worker thread
+        self.time_worker = TimeWorker(self.alg)
+        self.time_worker_thread = QtCore.QThread()
 
-        # CONNECT SIGNALS
-        # worker->gui update time label signal
-        self.worker.updateTimeSig.connect(self.gui.updateTimeDisplay)
+        self.runWorkerThreads()
 
-        # worker->gui update answer label signal
-        self.worker.updateAnsSig.connect(self.gui.updateAnsDisplay)
+        print("APP INITIALIZED")
 
-        # gui->worker update time mode signal (lambda function to translate button toggle state -> time mode string)
-        self.gui.change_time_mode_button.clicked.connect(
-            lambda: self.worker.updateTimeMode("am" if self.gui.change_time_mode_button.isChecked() else "military")
-        )
+    def _destroy(self):
+        self.ir_worker._destroy()
 
-        # gui->worker update diff mode signal (lambda function to translate button toggle state -> diff mode string)
-        self.gui.change_diff_mode_button.clicked.connect(
-            lambda: self.worker.updateDiffMode("easy" if self.gui.change_diff_mode_button.isChecked() else "hard")
-        )
+        self.time_worker.stopTimeThread()
+        self.time_worker_thread.wait()
 
-        # gui->worker show answer signal (use button toggle state as flag to show/hide answer)
-        self.gui.show_answer_button.clicked.connect(
-            lambda: self.worker.getAnswerStr(self.gui.show_answer_button.isChecked())
-        )
+    def runWorkerThreads(self):
+        self.time_worker.moveToThread(self.time_worker_thread)
+        self.time_worker_thread.start()
 
-        # gui->worker time updated signal (so we can sync answer string if show answer is toggled)
-        self.gui.updateTimeDoneSig.connect(
-            lambda: self.worker.getAnswerStr(self.gui.show_answer_button.isChecked())
-        )
+        # Connect worker threads
+        self.connectWorkerThreads()
+
+        # Start timer thread
+        time.sleep(0.2)
+        self.start_update_time_thread_sig.emit()
+
+    def connectWorkerThreads(self):
+        # IR -> TimeWorker
+        self.ir_worker.cycle_time_mode_sig.connect(self.time_worker.CycleTimeMode)
+        print("Signal object ID at connect:", id(self.ir_worker.cycle_time_mode_sig))
+        self.ir_worker.cycle_diff_mode_sig.connect(self.time_worker.CycleDiffMode)
+        self.ir_worker.toggle_answer_flag_sig.connect(self.time_worker.toggleAnswerFlag)
+        self.ir_worker.toggle_dark_mode_sig.connect(self.time_worker.toggleDarkMode)
+
+        # TimeWorker -> Gui
+        self.time_worker.update_time_sig.connect(self.gui.updateTimeDisplay)
+        self.time_worker.update_ans_sig.connect(self.gui.updateAnsDisplay)
+        self.time_worker.update_dark_sig.connect(self.gui.updateDarkMode)
 
         # app->worker start time thread signal
-        self.startUpdateTimeThreadSig.connect(self.worker.startTimeThread)
+        self.start_update_time_thread_sig.connect(self.time_worker.startTimeThread)
 
-        # Start time update thread after wait
-        time.sleep(0.2)
-        self.startUpdateTimeThreadSig.emit()
-        
-        # gui->dark mode toggle signal (switches between light and dark themes)
-        self.gui.dark_mode_button.clicked.connect(self.gui.toggleDarkMode)
-        
-def main():
-    # create app
-    app = QApplication(sys.argv)
-    myApp = MyApp(app)
-
-    # start the app
-    sys.exit(app.exec_())
-
-
-if __name__ == '__main__':
-    main()

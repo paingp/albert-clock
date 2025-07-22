@@ -57,6 +57,10 @@ class hasher:
 
       self.cb = pi.callback(gpio, pigpio.EITHER_EDGE, self._cb)
 
+   def _destroy():
+       self.cb.cancel()
+       self.pi.stop()
+
    def _hash(self, old_val, new_val):
 
       if   new_val < (old_val * 0.60):

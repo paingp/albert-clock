@@ -2,7 +2,6 @@ import time
 import pigpio
 from ir_hasher import hasher
 
-
 def cbfunc(hash):
     global hashes
     button = "UNKNOWN"
@@ -54,4 +53,5 @@ if __name__ == '__main__':
     time.sleep(300)
 
     pi.stop()
+
 
