@@ -11,12 +11,13 @@ MyApp::MyApp(int& argc, char** argv):
     Initialize();
 }
 
-
-MyApp::~MyApp() {
+MyApp::~MyApp() 
+{
     delete window_obj;
 }
 
-void MyApp::Initialize() {
+void MyApp::Initialize() 
+{
     window_obj = new MyWindow();
     window_obj->show();
 }

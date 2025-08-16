@@ -7,12 +7,16 @@
 // local includes
 #include "mywindow.h"
 
-class MyApp : public QApplication {
+class MyApp : public QApplication
+{
+
     public:
+
         MyApp(int& argc, char** argv);
         ~MyApp();
 
     private:
+
         MyWindow* window_obj;
         Worker* worker;
 

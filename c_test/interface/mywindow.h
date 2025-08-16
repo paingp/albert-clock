@@ -11,7 +11,8 @@
 
 // library includes
 
-class MyWindow : public QWidget {
+class MyWindow : public QWidget 
+{
     Q_OBJECT
 
     public:
@@ -31,6 +32,7 @@ class MyWindow : public QWidget {
         void Initialize();
 
     private Q_SLOTS: 
+
         void updateTimeLabel(QString time_str);
         void updateAnswerLabel(QString ans_str);
 };

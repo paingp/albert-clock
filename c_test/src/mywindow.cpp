@@ -11,7 +11,8 @@ MyWindow::MyWindow(QWidget* parent):
     Initialize();
 }
 
-void MyWindow::Initialize() {
+void MyWindow::Initialize()
+{
     // set up window
     this->setWindowTitle("Albert Clock");
     this->setGeometry(200, 200, 800, 400);

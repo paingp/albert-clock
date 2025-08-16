@@ -7,7 +7,8 @@
 
 // local includes
 
-class MyWorker : public QObject {
+class MyWorker : public QObject
+{
     Q_OBJECT
 
     public:
@@ -27,7 +28,6 @@ class MyWorker : public QObject {
 
         void updateTimeLablSig(QString time_str);
         void updateAnswerLablSig(QString time_str);
-
 };
 
 #endif
